@@ -618,6 +618,9 @@ test.each([[1, 'one']] as const)('%i is %s', async (n, word, { app }) => { n sat
 declare const pairs: ReadonlyArray<readonly [number, string]>;
 test.each(pairs)('%i is %s', async (n, word, { app }) => { n satisfies number; word satisfies string; void app; });
 test.for(pairs)('%i is %s', async ([n, word], { app }) => { n satisfies number; word satisfies string; void app; });
+// A table that mixes array and non-array rows is never spread, as at run time.
+declare const mixed: ReadonlyArray<readonly [number, string] | { user: string }>;
+test.each(mixed)('row %#', async (row, { app }) => { row satisfies readonly [number, string] | { user: string }; void app; });
 // @ts-expect-error rows are an array
 test.each('ab');
 // @ts-expect-error the registrar registers tests and has no modifiers

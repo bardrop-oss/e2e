@@ -187,10 +187,11 @@ test.each([
 ])('ships %s for %s', async (speed, price, { screen }) => {});
 ```
 
-- The body gets the row first and the fixtures last. An array row is spread,
-  so `[speed, price]` arrives as `(speed, price, fixtures)`. Any other row
-  arrives whole, as `(row, fixtures)`.
-- The title is formatted from the row, as in Vitest:
+- The body gets the row first and the fixtures last. When every row is an
+  array, each row is spread, so `[speed, price]` arrives as
+  `(speed, price, fixtures)`. When any row is not an array, every row
+  arrives whole, as `(row, fixtures)`, as in Vitest and Jest.
+- The title is formatted from the row:
 
   | In the title | Becomes |
   | --- | --- |
@@ -199,13 +200,19 @@ test.each([
   | `%o` | The next item as Node's `inspect` shows it, so a string is quoted. |
   | `%d` | The next item as a number (`Number(item)`). |
   | `%i`, `%f` | The next item read as an integer or a float, like `parseInt` / `parseFloat`: `'42px'` becomes `42`. |
-  | `%j` | The next item as JSON. |
+  | `%j` | The next item as JSON. A circular value shows as `[Circular]`. |
   | `%#`, `%$` | The row index, from 0, and the row number, from 1. |
   | `%%` | A percent sign. |
 
   The items are an array row's items in order; any other row is the one
   item. A placeholder with no item left, or `$name` on a row that is not an
-  object, stays as written.
+  object, stays as written. A value always shows on one line.
+- A title is part of the test id. `%#` and `%$` change when rows are added or
+  moved, so prefer `$name` or a value placeholder for ids that stay stable.
+- Titles differ from Vitest in a few places: `$0` and `$1` do not read an
+  array row, `$name` is not read from an array row's first item, `%s` shows
+  an object with `inspect`, not its own `toString` (a `URL` is not shown as
+  its href), and `%O` and `%c` are not placeholders.
 - Each row is a separate test, with its own id, report entry, and retries.
   Options apply to every row, so a [`skip`](#skip) or [`tags`](#tags)
   option skips or tags them all.
@@ -216,6 +223,7 @@ test.each([
 | --- | --- |
 | `COLLECTION_ERROR` | The rows are not an array, or the array is empty. |
 | `COLLECTION_ERROR` | Two rows format to the same title. Put a placeholder in the title that tells the rows apart. |
+| `COLLECTION_ERROR` | A `%j` item cannot be turned into JSON for a reason other than a cycle, such as a `BigInt`. The message names the row. |
 
 #### `test.for`
 
@@ -967,9 +975,9 @@ export interface TestAPI<Fixtures = TestFixtures, Worker = WorkerFixtures> exten
    * fn)`, in row order. The title is formatted from the row: `$name` and
    * `$name.path` read an object row, and `%s`, `%d`, `%i`, `%f`, `%j`, `%o`
    * take an array row's items in order (any other row is the one item). `%#`
-   * is the row index, `%$` the row number, `%%` a percent sign. An array row
-   * is spread into the body's arguments, any other row is the first one, and
-   * the fixtures come last:
+   * is the row index, `%$` the row number, `%%` a percent sign. When every
+   * row is an array, each row is spread into the body's arguments; otherwise
+   * every row is the first one. The fixtures come last:
    *
    *   test.each([{ user: 'Ada' }, { user: 'Grace' }])('signs in as $user', async ({ user }, { app }) => {});
    *   test.each([[1, 2, 3]])('%i + %i = %i', async (a, b, sum, { app }) => {});
@@ -1305,8 +1313,12 @@ export type SynchronousBody<Result> = Extract<Result, PromiseLike<unknown>> exte
   ? () => Result
   : never;
 
-/** The `test.each` body arguments for a row: an array row spread, any other row whole, then the fixtures. */
-export type EachArgs<Row, Fixtures> = Row extends readonly unknown[] ? [...Row, Fixtures] : [Row, Fixtures];
+/**
+ * The `test.each` body arguments for the rows' type: array rows spread, then
+ * the fixtures. Rows that are not all arrays are passed whole. Not
+ * distributive, so a mixed table is decided once, as at run time.
+ */
+export type EachArgs<Row, Fixtures> = [Row] extends [readonly unknown[]] ? [...Row, Fixtures] : [Row, Fixtures];
 
 /** A `test.each` or `test.for` body: the row's arguments, then the fixtures. */
 export type EachFn<Args extends readonly unknown[]> = (...args: Args) => void | Promise<void>;

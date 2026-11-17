@@ -52,12 +52,14 @@ export function formatEachTitle(title: string, row: unknown, index: number): str
         return typeof item === 'symbol' ? 'NaN' : String(Number(item));
       case '%i':
         return typeof item === 'bigint' ? `${item}n` : String(Number.parseInt(String(item)));
-      case '%f':
-        return String(Number.parseFloat(String(item)));
+      case '%f': {
+        const value = typeof item === 'number' ? item : Number.parseFloat(String(item));
+        return Object.is(value, -0) ? '-0' : String(value);
+      }
       case '%j':
-        return json(item);
+        return json(item, index);
       case '%o':
-        return inspect(item, { breakLength: Infinity, depth: 4 });
+        return inspect(item, ONE_LINE);
       default:
         return display(item);
     }
@@ -77,15 +79,25 @@ function readPath(row: object, key: string): unknown {
   return value;
 }
 
+/**
+ * Node's inspect on one line. A title is a test id, so it must not break:
+ * `breakLength` alone still groups long arrays and splits deep objects,
+ * `compact: true` keeps them on one line.
+ */
+const ONE_LINE = { breakLength: Infinity, compact: true, depth: 4 } as const;
+
 /** A string as written, anything else as Node's inspect shows it on one line. */
 function display(value: unknown): string {
-  return typeof value === 'string' ? value : inspect(value, { breakLength: Infinity, depth: 4 });
+  return typeof value === 'string' ? value : inspect(value, ONE_LINE);
 }
 
-function json(value: unknown): string {
+/** `%j`: JSON, `[Circular]` for a circular value; any other failure names the row. */
+function json(value: unknown, index: number): string {
   try {
     return JSON.stringify(value) ?? String(value);
-  } catch {
-    return '[Circular]';
+  } catch (error) {
+    if (error instanceof TypeError && /circular/i.test(error.message)) return '[Circular]';
+    const reason = error instanceof Error ? error.message : String(error);
+    throw new CollectionError(`%j cannot format the row at index ${index}: ${reason}`);
   }
 }

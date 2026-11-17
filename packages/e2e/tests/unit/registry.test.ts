@@ -253,6 +253,9 @@ describe('registration', () => {
       test.each([{ text: '%s and $id', id: 9 }])('$text is not read again', noop);
       test.each([['42px', '1.5e3', '2.5kg', 1e21]])('%i %f %f %i', noop);
       test.each([[Symbol('s'), Symbol('t'), Symbol('u')]])('%d %i %f', noop);
+      test.each([[[1, 2, 3, 4, 5, 6, 7]]])('ids %s', noop);
+      test.each([{ tags: ['a', 'b', 'c', 'd', 'e', 'f', 'g'], deep: { a: { b: { c: { d: 1 } } } } }])('$tags %o', noop);
+      test.each([[-0, '-0']])('%f %f', noop);
     });
     expect(registration.tests.map((item) => [item.title, item.mode])).toEqual([
       ['signs in as Ada on pro', 'normal'],
@@ -268,24 +271,30 @@ describe('registration', () => {
       ['%s and $id is not read again', 'normal'],
       ['42 1500 2.5 1', 'normal'],
       ['NaN NaN NaN', 'normal'],
+      ['ids [ 1, 2, 3, 4, 5, 6, 7 ]', 'normal'],
+      ["[ 'a', 'b', 'c', 'd', 'e', 'f', 'g' ] { tags: [ 'a', 'b', 'c', 'd', 'e', 'f', 'g' ], deep: { a: { b: { c: { d: 1 } } } } }", 'normal'],
+      ['-0 -0', 'normal'],
     ]);
     const indexes = registration.tests.map((item) => item.declarationIndex);
     expect(indexes).toEqual(indexes.toSorted((a, b) => a - b));
   });
 
-  it('passes test.each rows spread before the fixtures and test.for rows whole', async () => {
+  it('spreads test.each rows before the fixtures only when every row is an array, and passes test.for rows whole', async () => {
     const calls: unknown[][] = [];
     const record = async (...args: unknown[]) => {
       calls.push(args);
     };
     const registration = await collectModule(async () => {
-      test.each([[1, 'one'], { user: 'Ada' }, 'plain'])('each %#', record);
+      test.each([[1, 'one'], [2, 'two']])('each %#', record);
+      test.each([[1, 'one'], { user: 'Ada' }, 'plain'])('mixed %#', record);
       test.for([[1, 'one'], { user: 'Ada' }])('for %#', record);
     });
     const fixtures = { app: 'app fixture' };
     for (const registered of registration.tests) await (registered.fn as (fixtures: unknown) => Promise<void>)(fixtures);
     expect(calls).toEqual([
       [1, 'one', fixtures],
+      [2, 'two', fixtures],
+      [[1, 'one'], fixtures],
       [{ user: 'Ada' }, fixtures],
       ['plain', fixtures],
       [[1, 'one'], fixtures],
@@ -322,6 +331,15 @@ describe('registration', () => {
     await expect(collectModule(async () => test.each([1])('bad', { retry: 1 } as never, noop))).rejects.toThrow(
       /test options has unknown key "retry"/,
     );
+    await expect(collectModule(async () => test.each([[1], [2n]])('%j', noop))).rejects.toThrow(
+      /^%j cannot format the row at index 1: Do not know how to serialize a BigInt/,
+    );
+    const circular: Record<string, unknown> = {};
+    circular.self = circular;
+    const formatted = await collectModule(async () => {
+      test.each([[circular]])('%j', noop);
+    });
+    expect(formatted.tests.map((item) => item.title)).toEqual(['[Circular]']);
     const same = await collectModule(async () => {
       test.each([1, 2])('same title', noop);
     });

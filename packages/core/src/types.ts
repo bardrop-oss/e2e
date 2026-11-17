@@ -832,8 +832,12 @@ export interface TestRegistrar<Fixtures = TestFixtures & WorkerFixtures> {
   (title: string, options: TestOptions, fn: TestFn<Fixtures>): TestCase;
 }
 
-/** The `test.each` body arguments for a row: an array row spread, any other row whole, then the fixtures. */
-export type EachArgs<Row, Fixtures> = Row extends readonly unknown[] ? [...Row, Fixtures] : [Row, Fixtures];
+/**
+ * The `test.each` body arguments for the rows' type: array rows spread, then
+ * the fixtures. Rows that are not all arrays are passed whole. Not
+ * distributive, so a mixed table is decided once, as at run time.
+ */
+export type EachArgs<Row, Fixtures> = [Row] extends [readonly unknown[]] ? [...Row, Fixtures] : [Row, Fixtures];
 
 /** A `test.each` or `test.for` body: the row's arguments, then the fixtures. */
 export type EachFn<Args extends readonly unknown[]> = (...args: Args) => void | Promise<void>;
@@ -891,9 +895,9 @@ export interface TestAPI<Fixtures = TestFixtures, Worker = WorkerFixtures> exten
    * fn)`, in row order. The title is formatted from the row: `$name` and
    * `$name.path` read an object row, and `%s`, `%d`, `%i`, `%f`, `%j`, `%o`
    * take an array row's items in order (any other row is the one item). `%#`
-   * is the row index, `%$` the row number, `%%` a percent sign. An array row
-   * is spread into the body's arguments, any other row is the first one, and
-   * the fixtures come last:
+   * is the row index, `%$` the row number, `%%` a percent sign. When every
+   * row is an array, each row is spread into the body's arguments; otherwise
+   * every row is the first one. The fixtures come last:
    *
    *   test.each([{ user: 'Ada' }, { user: 'Grace' }])('signs in as $user', async ({ user }, { app }) => {});
    *   test.each([[1, 2, 3]])('%i + %i = %i', async (a, b, sum, { app }) => {});

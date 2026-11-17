@@ -752,25 +752,29 @@ function createTestAPI(chain: readonly FixtureDefinition[]): TestAPI {
 
   /**
    * The `test.each` and `test.for` call forms: one `test()` per row, in row
-   * order, titled from the row. `spread` passes an array row's items as the
-   * body's first arguments; otherwise the row is the first argument. The
-   * fixtures always come last.
+   * order, titled from the row. `spread` passes each array row's items as
+   * the body's first arguments; it is decided once for the table, like
+   * Vitest and Jest, so it only applies when every row is an array.
+   * Otherwise the row is the first argument. The fixtures always come last.
    */
-  const eachRegistrar = (api: string, rows: readonly unknown[], spread: boolean): EachRegistrar<unknown[]> => (
-    title: string,
-    optionsOrFn: TestOptions | EachFn<unknown[]>,
-    maybeFn?: EachFn<unknown[]>,
-  ): readonly TestCase[] => {
-    const collector = requireCollector(api);
-    const { options, fn: body } = normalizeArgs(optionsOrFn, maybeFn);
-    if (typeof body !== 'function') throw new CollectionError('test body must be a function');
-    // Array.from, not map: a hole in the rows is a row too, `undefined`.
-    return Array.from(rows, (row, index) => {
-      const args: unknown[] = spread && Array.isArray(row) ? [...row] : [row];
-      const rowTitle = typeof title === 'string' ? formatEachTitle(title, row, index) : title;
-      const rowFn: TestBody = (fixtures) => body(...args, fixtures);
-      return collector.registerTest('test', modeOf(options), rowTitle, options, [], rowFn, chain);
-    });
+  const eachRegistrar = (api: string, rows: readonly unknown[], spread: boolean): EachRegistrar<unknown[]> => {
+    // Array.from, not every: a hole in the rows is a row too, `undefined`.
+    const spreadRows = spread && Array.from(rows).every((row) => Array.isArray(row));
+    const register = registrar(api);
+    return (
+      title: string,
+      optionsOrFn: TestOptions | EachFn<unknown[]>,
+      maybeFn?: EachFn<unknown[]>,
+    ): readonly TestCase[] => {
+      requireCollector(api);
+      const { options, fn: body } = normalizeArgs(optionsOrFn, maybeFn);
+      if (typeof body !== 'function') throw new CollectionError('test body must be a function');
+      return Array.from(rows, (row, index) => {
+        const args: unknown[] = spreadRows ? [...(row as unknown[])] : [row];
+        const rowTitle = typeof title === 'string' ? formatEachTitle(title, row, index) : title;
+        return register(rowTitle, options, (fixtures) => body(...args, fixtures));
+      });
+    };
   };
 
   const api: TestAPI = Object.assign(testFunction, {
