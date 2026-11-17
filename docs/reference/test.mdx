@@ -199,7 +199,7 @@ test.each([
   | `%s` | The next item, shown the same way. |
   | `%o` | The next item as Node's `inspect` shows it, so a string is quoted. |
   | `%d` | The next item as a number (`Number(item)`), except a `BigInt` keeps its `n` suffix and a `Symbol` shows as `NaN`. |
-  | `%i`, `%f` | The next item read as an integer or a float, like `parseInt` / `parseFloat`: `'42px'` becomes `42`. |
+  | `%i`, `%f` | The next item read as an integer or a float, like `parseInt` / `parseFloat`: `'42px'` becomes `42`. A `BigInt` keeps its `n` suffix under `%i`. |
   | `%j` | The next item as JSON. A circular value shows as `[Circular]`. |
   | `%#`, `%$` | The row index, from 0, and the row number, from 1. |
   | `%%` | A percent sign. |
