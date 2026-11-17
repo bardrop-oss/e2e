@@ -238,6 +238,94 @@ describe('registration', () => {
     );
   });
 
+  it('registers one test.each test per row, in row order, titled from the row', async () => {
+    const registration = await collectModule(async () => {
+      test.each([{ user: 'Ada', plan: { name: 'pro' } }, { user: 'Grace', plan: { name: 'free' } }])(
+        'signs in as $user on $plan.name',
+        noop,
+      );
+      test.each([[1, 2, 3], [2, 2, 4]])('%i + %i = %d', noop);
+      test.each(['a', 'b'])('row %# of letter %s, number %$', noop);
+      test.for([[1, { a: 'x' }]])('%i and %j via test.for, title as in test.each', noop);
+      test.each([{ a: [1, 2] }])('%o', noop);
+      test.each([{ id: 1 }])('$missing $id.deep %s 100%% %s', noop);
+      test.each([7])('only $user stays as written', noop);
+      test.each([{ text: '%s and $id', id: 9 }])('$text is not read again', noop);
+    });
+    expect(registration.tests.map((item) => [item.title, item.mode])).toEqual([
+      ['signs in as Ada on pro', 'normal'],
+      ['signs in as Grace on free', 'normal'],
+      ['1 + 2 = 3', 'normal'],
+      ['2 + 2 = 4', 'normal'],
+      ['row 0 of letter a, number 1', 'normal'],
+      ['row 1 of letter b, number 2', 'normal'],
+      ['1 and {"a":"x"} via test.for, title as in test.each', 'normal'],
+      ['{ a: [ 1, 2 ] }', 'normal'],
+      ['undefined undefined { id: 1 } 100% %s', 'normal'],
+      ['only $user stays as written', 'normal'],
+      ['%s and $id is not read again', 'normal'],
+    ]);
+    const indexes = registration.tests.map((item) => item.declarationIndex);
+    expect(indexes).toEqual(indexes.toSorted((a, b) => a - b));
+  });
+
+  it('passes test.each rows spread before the fixtures and test.for rows whole', async () => {
+    const calls: unknown[][] = [];
+    const record = async (...args: unknown[]) => {
+      calls.push(args);
+    };
+    const registration = await collectModule(async () => {
+      test.each([[1, 'one'], { user: 'Ada' }, 'plain'])('each %#', record);
+      test.for([[1, 'one'], { user: 'Ada' }])('for %#', record);
+    });
+    const fixtures = { app: 'app fixture' };
+    for (const registered of registration.tests) await (registered.fn as (fixtures: unknown) => Promise<void>)(fixtures);
+    expect(calls).toEqual([
+      [1, 'one', fixtures],
+      [{ user: 'Ada' }, fixtures],
+      ['plain', fixtures],
+      [[1, 'one'], fixtures],
+      [{ user: 'Ada' }, fixtures],
+    ]);
+  });
+
+  it('applies test.each options to every row and works on an extended test', async () => {
+    const extended = test.extend({ workspace: async (_fixtures: unknown, use: (value: string) => Promise<void>) => use('w') });
+    const registration = await collectModule(async () => {
+      test.each([1, 2])('skipped %s', { skip: 'not yet', tags: ['@each'] }, noop);
+      test.for([1])('focused %s', { only: true }, noop);
+      extended.each([1])('extended %s', noop);
+    });
+    expect(
+      registration.tests.map((item) => [item.title, item.mode, item.options, item.tags, item.fixtures.map((definition) => definition.name)]),
+    ).toEqual([
+      ['skipped 1', 'skip', { skip: 'not yet', tags: ['@each'] }, ['@each'], []],
+      ['skipped 2', 'skip', { skip: 'not yet', tags: ['@each'] }, ['@each'], []],
+      ['focused 1', 'only', { only: true }, [], []],
+      ['extended 1', 'normal', {}, [], ['workspace']],
+    ]);
+  });
+
+  it('rejects test.each and test.for rows that are not a non-empty array, and bad calls', async () => {
+    expect(() => test.each('ab' as never)).toThrow('test.each() takes an array of rows, got "ab"');
+    expect(() => test.for(undefined as never)).toThrow(/^test\.for\(\) takes an array of rows, got undefined/);
+    expect(() => test.each([])).toThrow('test.each() got no rows; pass at least one');
+    expect(() => test.for([])).toThrow('test.for() got no rows; pass at least one');
+    expect(() => test.each([1])('outside %s', noop)).toThrow(/^test\.each\(\) /);
+    await expect(collectModule(async () => test.each([1])('no body %s', {} as never))).rejects.toThrow(
+      'test body function is required',
+    );
+    await expect(collectModule(async () => test.each([1])('bad', { retry: 1 } as never, noop))).rejects.toThrow(
+      /test options has unknown key "retry"/,
+    );
+    const same = await collectModule(async () => {
+      test.each([1, 2])('same title', noop);
+    });
+    expect(() => collectFromRegistration('/root', '/root/tests/each.e2e.ts', same)).toThrow(
+      'duplicate title path same title in tests/each.e2e.ts',
+    );
+  });
+
   it('rejects test.skipIf and test.runIf in a serial group whatever the condition', async () => {
     const calls: Array<[string, () => void]> = [
       ['test.skipIf()', () => test.skipIf(true)('member', noop)],

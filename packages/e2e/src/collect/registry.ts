@@ -12,12 +12,15 @@ import { validateTitle } from '@e2e-dev/core/lib/internal/ids';
 import { realmSlot } from '@e2e-dev/core/lib/internal/realm-slot';
 import { markRunningTestExpectedToFail } from '@e2e-dev/core/lib/internal/expected-failure';
 import { parseModifierCall, skipRunningTest } from '../internal/skip.ts';
+import { formatEachTitle, readRows } from './each.ts';
 import { unknownKeyMessage } from '@e2e-dev/core/lib/internal/options';
 import type { SourceLocation } from '@e2e-dev/core/lib/internal/source';
 import { fixtureNames } from './fixture-names.ts';
 import { checkDeclaredFixtures, describeFixture, describeUser } from './fixture-plan.ts';
 import type {
   DescribeOptions,
+  EachFn,
+  EachRegistrar,
   FixtureFn,
   FixtureScope,
   SetupOptions,
@@ -642,10 +645,10 @@ function captureSource(moduleFile: string | undefined): SourceLocation | undefin
   return outsideModule;
 }
 
-function normalizeArgs(
-  optionsOrFn: TestOptions | TestBody,
-  maybeFn: TestBody | undefined,
-): { options: TestOptions; fn: TestBody } {
+function normalizeArgs<Fn extends TestBody | EachFn<unknown[]>>(
+  optionsOrFn: TestOptions | Fn,
+  maybeFn: Fn | undefined,
+): { options: TestOptions; fn: Fn } {
   if (typeof optionsOrFn === 'function') {
     return { options: {}, fn: optionsOrFn };
   }
@@ -709,6 +712,12 @@ function fixtureDefinition(name: string, entry: unknown): Pick<FixtureDefinition
   return { fn: entry[0] as FixtureFn<object, unknown>, scope: scope as FixtureScope | undefined, auto };
 }
 
+/** How a test registers from its options: focused, skipped, or normal. */
+function modeOf(options: TestOptions): TestMode {
+  if (options.only === true) return 'only';
+  return options.skip !== undefined && options.skip !== false ? 'skip' : 'normal';
+}
+
 /**
  * One `test` object per fixture chain. Every registration made through it
  * records the chain, so an attempt knows which fixtures it can set up; the
@@ -737,10 +746,32 @@ function createTestAPI(chain: readonly FixtureDefinition[]): TestAPI {
     const options = skip === true
       ? { ...given, skip: typeof given.skip === 'string' ? given.skip : true }
       : given;
-    const mode: TestMode = options.only === true ? 'only' : options.skip !== undefined && options.skip !== false ? 'skip' : 'normal';
-    return collector.registerTest('test', mode, title, options, [], fn, chain);
+    return collector.registerTest('test', modeOf(options), title, options, [], fn, chain);
   };
   const testFunction = registrar('test()');
+
+  /**
+   * The `test.each` and `test.for` call forms: one `test()` per row, in row
+   * order, titled from the row. `spread` passes an array row's items as the
+   * body's first arguments; otherwise the row is the first argument. The
+   * fixtures always come last.
+   */
+  const eachRegistrar = (api: string, rows: readonly unknown[], spread: boolean): EachRegistrar<unknown[]> => (
+    title: string,
+    optionsOrFn: TestOptions | EachFn<unknown[]>,
+    maybeFn?: EachFn<unknown[]>,
+  ): readonly TestCase[] => {
+    const collector = requireCollector(api);
+    const { options, fn: body } = normalizeArgs(optionsOrFn, maybeFn);
+    if (typeof body !== 'function') throw new CollectionError('test body must be a function');
+    // Array.from, not map: a hole in the rows is a row too, `undefined`.
+    return Array.from(rows, (row, index) => {
+      const args: unknown[] = spread && Array.isArray(row) ? [...row] : [row];
+      const rowTitle = typeof title === 'string' ? formatEachTitle(title, row, index) : title;
+      const rowFn: TestBody = (fixtures) => body(...args, fixtures);
+      return collector.registerTest('test', modeOf(options), rowTitle, options, [], rowFn, chain);
+    });
+  };
 
   const api: TestAPI = Object.assign(testFunction, {
     skip(first?: string | boolean, second?: TestBody | string): TestCase | undefined {
@@ -764,6 +795,12 @@ function createTestAPI(chain: readonly FixtureDefinition[]): TestAPI {
     },
     runIf(condition: unknown): TestRegistrar<object> {
       return registrar('test.runIf()', !readCondition('test.runIf()', condition));
+    },
+    each(rows: unknown): EachRegistrar<unknown[]> {
+      return eachRegistrar('test.each()', readRows('test.each()', rows), true);
+    },
+    for(rows: unknown): EachRegistrar<unknown[]> {
+      return eachRegistrar('test.for()', readRows('test.for()', rows), false);
     },
     only(title: string, fn: TestBody): TestCase {
       return requireCollector('test.only()').registerTest('test', 'only', title, { only: true }, [], fn, chain);
