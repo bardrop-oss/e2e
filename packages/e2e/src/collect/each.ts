@@ -48,11 +48,12 @@ export function formatEachTitle(title: string, row: unknown, index: number): str
     next += 1;
     switch (token) {
       case '%d':
-        return typeof item === 'bigint' ? `${item}n` : String(Number(item));
+        if (typeof item === 'bigint') return `${item}n`;
+        return typeof item === 'symbol' ? 'NaN' : String(Number(item));
       case '%i':
-        return typeof item === 'bigint' ? `${item}n` : String(Math.trunc(Number(item)));
+        return typeof item === 'bigint' ? `${item}n` : String(Number.parseInt(String(item)));
       case '%f':
-        return String(Number(item));
+        return String(Number.parseFloat(String(item)));
       case '%j':
         return json(item);
       case '%o':

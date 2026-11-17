@@ -195,8 +195,10 @@ test.each([
   | In the title | Becomes |
   | --- | --- |
   | `$name`, `$name.path` | That key of an object row. A string shows as written, any other value as Node's `inspect` shows it. |
-  | `%s`, `%o` | The next item, shown the same way. |
-  | `%d`, `%i`, `%f` | The next item as a number, an integer, or a float. |
+  | `%s` | The next item, shown the same way. |
+  | `%o` | The next item as Node's `inspect` shows it, so a string is quoted. |
+  | `%d` | The next item as a number (`Number(item)`). |
+  | `%i`, `%f` | The next item read as an integer or a float, like `parseInt` / `parseFloat`: `'42px'` becomes `42`. |
   | `%j` | The next item as JSON. |
   | `%#`, `%$` | The row index, from 0, and the row number, from 1. |
   | `%%` | A percent sign. |

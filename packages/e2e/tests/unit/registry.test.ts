@@ -251,6 +251,8 @@ describe('registration', () => {
       test.each([{ id: 1 }])('$missing $id.deep %s 100%% %s', noop);
       test.each([7])('only $user stays as written', noop);
       test.each([{ text: '%s and $id', id: 9 }])('$text is not read again', noop);
+      test.each([['42px', '1.5e3', '2.5kg', 1e21]])('%i %f %f %i', noop);
+      test.each([[Symbol('s'), Symbol('t'), Symbol('u')]])('%d %i %f', noop);
     });
     expect(registration.tests.map((item) => [item.title, item.mode])).toEqual([
       ['signs in as Ada on pro', 'normal'],
@@ -264,6 +266,8 @@ describe('registration', () => {
       ['undefined undefined { id: 1 } 100% %s', 'normal'],
       ['only $user stays as written', 'normal'],
       ['%s and $id is not read again', 'normal'],
+      ['42 1500 2.5 1', 'normal'],
+      ['NaN NaN NaN', 'normal'],
     ]);
     const indexes = registration.tests.map((item) => item.declarationIndex);
     expect(indexes).toEqual(indexes.toSorted((a, b) => a - b));
