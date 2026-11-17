@@ -256,6 +256,10 @@ describe('registration', () => {
       test.each([[[1, 2, 3, 4, 5, 6, 7]]])('ids %s', noop);
       test.each([{ tags: ['a', 'b', 'c', 'd', 'e', 'f', 'g'], deep: { a: { b: { c: { d: 1 } } } } }])('$tags %o', noop);
       test.each([[-0, '-0']])('%f %f', noop);
+      test.each([[function named(a: unknown) {
+        return a;
+      }, Symbol('s'), undefined]])('%j %j %j', noop);
+      test.each([{ 名前: 'Ada', ユーザー: { 名: 'L' } }])('$名前 $ユーザー.名', noop);
     });
     expect(registration.tests.map((item) => [item.title, item.mode])).toEqual([
       ['signs in as Ada on pro', 'normal'],
@@ -274,6 +278,8 @@ describe('registration', () => {
       ['ids [ 1, 2, 3, 4, 5, 6, 7 ]', 'normal'],
       ["[ 'a', 'b', 'c', 'd', 'e', 'f', 'g' ] { tags: [ 'a', 'b', 'c', 'd', 'e', 'f', 'g' ], deep: { a: { b: { c: { d: 1 } } } } }", 'normal'],
       ['-0 -0', 'normal'],
+      ['undefined undefined undefined', 'normal'],
+      ['Ada L', 'normal'],
     ]);
     const indexes = registration.tests.map((item) => item.declarationIndex);
     expect(indexes).toEqual(indexes.toSorted((a, b) => a - b));

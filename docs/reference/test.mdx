@@ -200,7 +200,7 @@ test.each([
   | `%o` | The next item as Node's `inspect` shows it, so a string is quoted. |
   | `%d` | The next item as a number (`Number(item)`), except a `BigInt` keeps its `n` suffix and a `Symbol` shows as `NaN`. |
   | `%i`, `%f` | The next item read as an integer or a float, like `parseInt` / `parseFloat`: `'42px'` becomes `42`. A `BigInt` keeps its `n` suffix under `%i`. |
-  | `%j` | The next item as JSON. A circular value shows as `[Circular]`. |
+  | `%j` | The next item as JSON. A circular value shows as `[Circular]`; a function, a `Symbol`, or `undefined` as `undefined`. |
   | `%#`, `%$` | The row index, from 0, and the row number, from 1. |
   | `%%` | A percent sign. |
 
@@ -213,7 +213,9 @@ test.each([
 - Titles differ from Vitest in a few places: `$0` and `$1` do not read an
   array row, `$name` is not read from an array row's first item, `%s` shows
   an object with `inspect`, not its own `toString` (a `URL` is not shown as
-  its href), and `%O` and `%c` are not placeholders.
+  its href), and `%O` and `%c` are not placeholders. The body differs too:
+  Vitest's `test.each` body gets only the row, while here the fixtures
+  come after it.
 - Each row is a separate test, with its own id, report entry, and retries.
   Options apply to every row, so a [`skip`](#skip) or [`tags`](#tags)
   option skips or tags them all.

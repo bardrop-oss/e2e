@@ -19,7 +19,7 @@ export function readRows(api: string, rows: unknown): readonly unknown[] {
  * One title token: a printf placeholder, as Vitest and Jest take them, or
  * `$name` / `$name.path`, read from an object row.
  */
-const TOKEN = /%[sdifjo#$%]|\$([A-Za-z_$][\w$]*(?:\.[\w$]+)*)/g;
+const TOKEN = /%[sdifjo#$%]|\$([\p{ID_Start}_$][\p{ID_Continue}$]*(?:\.[\p{ID_Continue}$]+)*)/gu;
 
 /**
  * The title of the row at `index`, formatted as Vitest formats a
@@ -91,10 +91,14 @@ function display(value: unknown): string {
   return typeof value === 'string' ? value : inspect(value, ONE_LINE);
 }
 
-/** `%j`: JSON, `[Circular]` for a circular value; any other failure names the row. */
+/**
+ * `%j`: JSON, `[Circular]` for a circular value, and `undefined` for what
+ * JSON leaves out (a function, a Symbol, `undefined`), as Vitest prints them;
+ * any other failure names the row.
+ */
 function json(value: unknown, index: number): string {
   try {
-    return JSON.stringify(value) ?? String(value);
+    return JSON.stringify(value) ?? 'undefined';
   } catch (error) {
     if (error instanceof TypeError && error.message.startsWith('Converting circular structure to JSON')) return '[Circular]';
     const reason = error instanceof Error ? error.message : String(error);

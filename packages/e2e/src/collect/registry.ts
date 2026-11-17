@@ -712,12 +712,6 @@ function fixtureDefinition(name: string, entry: unknown): Pick<FixtureDefinition
   return { fn: entry[0] as FixtureFn<object, unknown>, scope: scope as FixtureScope | undefined, auto };
 }
 
-/** How a test registers from its options: focused, skipped, or normal. */
-function modeOf(options: TestOptions): TestMode {
-  if (options.only === true) return 'only';
-  return options.skip !== undefined && options.skip !== false ? 'skip' : 'normal';
-}
-
 /**
  * One `test` object per fixture chain. Every registration made through it
  * records the chain, so an attempt knows which fixtures it can set up; the
@@ -746,7 +740,8 @@ function createTestAPI(chain: readonly FixtureDefinition[]): TestAPI {
     const options = skip === true
       ? { ...given, skip: typeof given.skip === 'string' ? given.skip : true }
       : given;
-    return collector.registerTest('test', modeOf(options), title, options, [], fn, chain);
+    const mode: TestMode = options.only === true ? 'only' : options.skip !== undefined && options.skip !== false ? 'skip' : 'normal';
+    return collector.registerTest('test', mode, title, options, [], fn, chain);
   };
   const testFunction = registrar('test()');
 
