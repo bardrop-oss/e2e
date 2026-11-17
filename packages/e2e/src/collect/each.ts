@@ -96,7 +96,7 @@ function json(value: unknown, index: number): string {
   try {
     return JSON.stringify(value) ?? String(value);
   } catch (error) {
-    if (error instanceof TypeError && /circular/i.test(error.message)) return '[Circular]';
+    if (error instanceof TypeError && error.message.startsWith('Converting circular structure to JSON')) return '[Circular]';
     const reason = error instanceof Error ? error.message : String(error);
     throw new CollectionError(`%j cannot format the row at index ${index}: ${reason}`);
   }

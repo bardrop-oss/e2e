@@ -835,9 +835,14 @@ export interface TestRegistrar<Fixtures = TestFixtures & WorkerFixtures> {
 /**
  * The `test.each` body arguments for the rows' type: array rows spread, then
  * the fixtures. Rows that are not all arrays are passed whole. Not
- * distributive, so a mixed table is decided once, as at run time.
+ * distributive, so a mixed table is decided once, as at run time. An
+ * `unknown` row may be either at run time, so only the fixtures, last, are known.
  */
-export type EachArgs<Row, Fixtures> = [Row] extends [readonly unknown[]] ? [...Row, Fixtures] : [Row, Fixtures];
+export type EachArgs<Row, Fixtures> = [Row] extends [readonly unknown[]]
+  ? [...Row, Fixtures]
+  : unknown extends Row
+    ? [...unknown[], Fixtures]
+    : [Row, Fixtures];
 
 /** A `test.each` or `test.for` body: the row's arguments, then the fixtures. */
 export type EachFn<Args extends readonly unknown[]> = (...args: Args) => void | Promise<void>;

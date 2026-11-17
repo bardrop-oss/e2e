@@ -166,13 +166,13 @@ test.each([
   | `$name`、`$name.path` | オブジェクトの行のそのキー。文字列はそのまま、それ以外の値は Node の `inspect` の表示になります。 |
   | `%s` | 次の項目。同じ方法で表示します。 |
   | `%o` | 次の項目を Node の `inspect` で表示します。文字列は引用符付きになります。 |
-  | `%d` | 次の項目を数値にしたもの（`Number(item)`）。 |
+  | `%d` | 次の項目を数値にしたもの（`Number(item)`）。ただし `BigInt` は `n` 接尾辞を残し、`Symbol` は `NaN` と表示します。 |
   | `%i`、`%f` | 次の項目を `parseInt` / `parseFloat` のように整数または浮動小数点数として読んだもの。`'42px'` は `42` になります。 |
   | `%j` | 次の項目の JSON。循環する値は `[Circular]` になります。 |
   | `%#`、`%$` | 0 から始まる行のインデックスと、1 から始まる行番号。 |
   | `%%` | パーセント記号。 |
 
-  項目は配列の行ならその要素を順に、それ以外の行なら行そのものを 1 つの項目として使います。残りの項目がないプレースホルダーや、オブジェクトでない行に対する `$name` は、書いたまま残ります。値は常に 1 行で表示します。
+  項目は配列の行ならその要素を順に、それ以外の行なら行そのものを 1 つの項目として使います。残りの項目がないプレースホルダーや、オブジェクトでない行に対する `$name` は、書いたまま残ります。文字列以外の値は常に 1 行で表示します。文字列は改行も含めて書いたまま表示します。
 - タイトルはテスト ID の一部です。`%#` と `%$` は行を追加したり移動したりすると変わるため、安定した ID には `$name` や値のプレースホルダーを使ってください。
 - タイトルはいくつかの点で Vitest と異なります。`$0` や `$1` は配列の行を読みません。`$name` は配列の行の最初の要素からは読みません。`%s` はオブジェクトを独自の `toString` ではなく `inspect` で表示します（`URL` は href として表示されません）。`%O` と `%c` はプレースホルダーではありません。
 - 各行は個別のテストで、それぞれ独自の ID、レポート項目、リトライを持ちます。オプションはすべての行に適用されるため、[`skip`](#skip) や [`tags`](#tags) オプションはすべての行をスキップ、またはタグ付けします。
@@ -1130,9 +1130,14 @@ export type SynchronousBody<Result> = Extract<Result, PromiseLike<unknown>> exte
 /**
  * The `test.each` body arguments for the rows' type: array rows spread, then
  * the fixtures. Rows that are not all arrays are passed whole. Not
- * distributive, so a mixed table is decided once, as at run time.
+ * distributive, so a mixed table is decided once, as at run time. An
+ * `unknown` row may be either at run time, so only the fixtures, last, are known.
  */
-export type EachArgs<Row, Fixtures> = [Row] extends [readonly unknown[]] ? [...Row, Fixtures] : [Row, Fixtures];
+export type EachArgs<Row, Fixtures> = [Row] extends [readonly unknown[]]
+  ? [...Row, Fixtures]
+  : unknown extends Row
+    ? [...unknown[], Fixtures]
+    : [Row, Fixtures];
 
 /** A `test.each` or `test.for` body: the row's arguments, then the fixtures. */
 export type EachFn<Args extends readonly unknown[]> = (...args: Args) => void | Promise<void>;

@@ -340,6 +340,10 @@ describe('registration', () => {
       test.each([[circular]])('%j', noop);
     });
     expect(formatted.tests.map((item) => item.title)).toEqual(['[Circular]']);
+    const own = { toJSON: () => { throw new TypeError('circular reference in my model'); } };
+    await expect(collectModule(async () => test.each([[own]])('%j', noop))).rejects.toThrow(
+      /^%j cannot format the row at index 0: circular reference in my model/,
+    );
     const same = await collectModule(async () => {
       test.each([1, 2])('same title', noop);
     });

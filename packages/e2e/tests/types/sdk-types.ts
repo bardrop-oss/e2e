@@ -621,6 +621,11 @@ test.for(pairs)('%i is %s', async ([n, word], { app }) => { n satisfies number; 
 // A table that mixes array and non-array rows is never spread, as at run time.
 declare const mixed: ReadonlyArray<readonly [number, string] | { user: string }>;
 test.each(mixed)('row %#', async (row, { app }) => { row satisfies readonly [number, string] | { user: string }; void app; });
+// An unknown row may be spread or not at run time: only the fixtures, last, are typed.
+declare const loose: unknown[];
+test.each(loose)('row %#', async (...args) => { args satisfies [...unknown[], TestFixtures]; });
+// @ts-expect-error an unknown row may be spread, so the second argument is not known to be the fixtures
+test.each(loose)('row %#', async (_row, { app }) => { void app; });
 // @ts-expect-error rows are an array
 test.each('ab');
 // @ts-expect-error the registrar registers tests and has no modifiers
