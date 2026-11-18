@@ -382,6 +382,9 @@ describe('registration', () => {
     expect(() => test.for([])).toThrow('test.for() got no rows; pass at least one');
     const tagged = test.each as unknown as (strings: TemplateStringsArray, ...values: unknown[]) => unknown;
     expect(() => tagged`a | b\n${1} | ${2}`).toThrow('test.each() takes an array of rows, not a template literal table');
+    // Only a template's own `raw` marks it: one the rows inherit does not.
+    const inherits: number[] = Object.setPrototypeOf([1], Object.create(Array.prototype, { raw: { value: [] } }));
+    expect(() => test.each(inherits)).not.toThrow();
     expect(() => test.each([1])('outside %s', noop)).toThrow(/^test\.each\(\) /);
     await expect(collectModule(async () => test.each([1])('no body %s', {} as never))).rejects.toThrow(
       'test body function is required',
@@ -521,6 +524,21 @@ describe('the fixtures a registration names', () => {
     }
     const rest = await failure(() => test('rest', (async ({ ...all }: object) => void all) as never));
     expect(rest.message).toContain('test "rest" takes the rest property "...all"');
+  });
+
+  it('puts the stack trace limit back when reading the stack throws', async () => {
+    const limit = Error.stackTraceLimit;
+    const prepare = Error.prepareStackTrace;
+    Error.prepareStackTrace = () => {
+      throw new RangeError('no stack');
+    };
+    try {
+      await expect(collectModule(async () => void test('x', noop))).rejects.toThrow('no stack');
+      expect(Error.stackTraceLimit).toBe(limit);
+    } finally {
+      Error.prepareStackTrace = prepare;
+      Error.stackTraceLimit = limit;
+    }
   });
 
   it('records where a hook was registered', async () => {

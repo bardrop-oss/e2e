@@ -65,6 +65,10 @@ describe('fixtureNames', () => {
   it('says how to wrap a bound function that takes a row first', () => {
     const bound = Function.prototype.bind.call((row: unknown, { app }: { app: unknown }) => [row, app], undefined) as FixtureUserFn;
     expect(() => fixtureNames(bound, 'test "x"', undefined, 1)).toThrow('or wrap it: (row, { app }) => bound(row, { app }). e2e sets up');
+    // A spread row hands over one argument per item, and the wrapper passes each on.
+    expect(() => fixtureNames(bound, 'test "x"', undefined, 3)).toThrow(
+      'or wrap it: (item1, item2, item3, { app }) => bound(item1, item2, item3, { app }). e2e sets up',
+    );
   });
 
   it('reads method shorthand, with a plain, computed, or quoted name', () => {

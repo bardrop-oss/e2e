@@ -10,7 +10,7 @@ export function readRows(api: string, rows: unknown): readonly unknown[] {
     throw new CollectionError(`${api} takes an array of rows, got ${describeValue(rows)}`);
   }
   // Jest and Vitest also take a table as a tagged template, whose strings would pass as rows.
-  if ('raw' in rows) {
+  if (Object.hasOwn(rows, 'raw')) {
     throw new CollectionError(`${api} takes an array of rows, not a template literal table; write each row as an object or an array`);
   }
   if (rows.length === 0) {

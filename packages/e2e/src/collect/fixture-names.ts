@@ -144,8 +144,10 @@ export function fixtureNames(fn: FixtureUserFn, what: string, source?: SourceLoc
   const text = Function.prototype.toString.call(fn);
   // A bound or built-in function prints no parameters, so it would be handed no fixtures at all.
   if (NATIVE.test(text)) {
-    const wrapper = position === 0 ? '({ app }) => bound({ app })' : '(row, { app }) => bound(row, { app })';
-    throw refuse(`is a bound or native function, whose parameters cannot be read; pass the function itself, or wrap it: ${wrapper}`);
+    // One argument per item of a spread row comes before the fixtures.
+    const row = position === 1 ? ['row'] : Array.from({ length: position }, (_, index) => `item${index + 1}`);
+    const taken = [...row, '{ app }'].join(', ');
+    throw refuse(`is a bound or native function, whose parameters cannot be read; pass the function itself, or wrap it: (${taken}) => bound(${taken})`);
   }
   const parameter = parameterAt(text, position);
   if (parameter === undefined) return [];

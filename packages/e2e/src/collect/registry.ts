@@ -622,8 +622,12 @@ function stackLocations(): SourceLocation[] {
   // that reaches the runner through a helper, a describe, and `test.each`.
   const limit = Error.stackTraceLimit;
   Error.stackTraceLimit = Infinity;
-  const stack = new Error().stack ?? '';
-  Error.stackTraceLimit = limit;
+  let stack: string;
+  try {
+    stack = new Error().stack ?? '';
+  } finally {
+    Error.stackTraceLimit = limit;
+  }
   return stack.split('\n').slice(1).flatMap((line) => {
     const match = STACK_FRAME.exec(line.trim());
     if (match === null) return [];
