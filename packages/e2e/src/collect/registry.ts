@@ -618,7 +618,13 @@ const STACK_FRAME = /^at (?:async )?(?:[^(]*? \()?(.+?):(\d+)(?::(\d+))?\)?$/;
  * the call sites at all.
  */
 function stackLocations(): SourceLocation[] {
-  return (new Error().stack ?? '').split('\n').slice(1).flatMap((line) => {
+  // The default limit of 10 frames cuts the test file's frame off a stack
+  // that reaches the runner through a helper, a describe, and `test.each`.
+  const limit = Error.stackTraceLimit;
+  Error.stackTraceLimit = Infinity;
+  const stack = new Error().stack ?? '';
+  Error.stackTraceLimit = limit;
+  return stack.split('\n').slice(1).flatMap((line) => {
     const match = STACK_FRAME.exec(line.trim());
     if (match === null) return [];
     // An ES module names itself by URL, the loader's cache-busting query included; a mapped frame or CommonJS by path.

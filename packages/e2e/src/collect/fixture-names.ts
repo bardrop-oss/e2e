@@ -143,7 +143,10 @@ export function fixtureNames(fn: FixtureUserFn, what: string, source?: SourceLoc
   const refuse = (problem: string): FixtureUseError => new FixtureUseError(`${what} ${problem}. ${WHY}`, source);
   const text = Function.prototype.toString.call(fn);
   // A bound or built-in function prints no parameters, so it would be handed no fixtures at all.
-  if (NATIVE.test(text)) throw refuse('is a bound or native function, whose parameters cannot be read; pass the function itself, or wrap it: ({ app }) => bound({ app })');
+  if (NATIVE.test(text)) {
+    const wrapper = position === 0 ? '({ app }) => bound({ app })' : '(row, { app }) => bound(row, { app })';
+    throw refuse(`is a bound or native function, whose parameters cannot be read; pass the function itself, or wrap it: ${wrapper}`);
+  }
   const parameter = parameterAt(text, position);
   if (parameter === undefined) return [];
   if (!parameter.startsWith('{')) {

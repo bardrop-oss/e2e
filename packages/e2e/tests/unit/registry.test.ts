@@ -260,6 +260,11 @@ describe('registration', () => {
         return a;
       }, Symbol('s'), undefined]])('%j %j %j', noop);
       test.each([{ 名前: 'Ada', ユーザー: { 名: 'L' } }])('$名前 $ユーザー.名', noop);
+      test.each([[new Error('boom'), new TypeError('bad')]])('%s %o', noop);
+      test.each([{ error: new RangeError('too far') }])('fails with $error', noop);
+      const inner = new Error('inner');
+      inner.stack = 'Error: inner\n    at somewhere (file.js:1:1)';
+      test.each([[{ cause: inner }, Symbol('a\nb')]])('%s %s', noop);
     });
     expect(registration.tests.map((item) => [item.title, item.mode])).toEqual([
       ['signs in as Ada on pro', 'normal'],
@@ -280,6 +285,9 @@ describe('registration', () => {
       ['-0 -0', 'normal'],
       ['undefined undefined undefined', 'normal'],
       ['Ada L', 'normal'],
+      ['Error: boom TypeError: bad', 'normal'],
+      ['fails with RangeError: too far', 'normal'],
+      ['{ cause: Error: inner at somewhere (file.js:1:1) } Symbol(a b)', 'normal'],
     ]);
     const indexes = registration.tests.map((item) => item.declarationIndex);
     expect(indexes).toEqual(indexes.toSorted((a, b) => a - b));
@@ -344,6 +352,10 @@ describe('registration', () => {
         void args;
       });
     })).rejects.toThrow(/test "rest 0" must destructure parameter 3, where it takes the fixtures.*it takes "\.\.\.args"/);
+    // Each row is spread on its own, so a row with fewer items puts the fixtures in a parameter that names an item.
+    await expect(collectModule(async () => {
+      test.each([[1, 2], [3]] as number[][])('short %#', (async (a: number, b: number, { app }: { app: unknown }) => void [a, b, app]) as never);
+    })).rejects.toThrow(/test "short 1" must destructure parameter 2, where it takes the fixtures.*it takes "b"/);
   });
 
   it('applies test.each options to every row and works on an extended test', async () => {
@@ -368,6 +380,8 @@ describe('registration', () => {
     expect(() => test.for(undefined as never)).toThrow(/^test\.for\(\) takes an array of rows, got undefined/);
     expect(() => test.each([])).toThrow('test.each() got no rows; pass at least one');
     expect(() => test.for([])).toThrow('test.for() got no rows; pass at least one');
+    const tagged = test.each as unknown as (strings: TemplateStringsArray, ...values: unknown[]) => unknown;
+    expect(() => tagged`a | b\n${1} | ${2}`).toThrow('test.each() takes an array of rows, not a template literal table');
     expect(() => test.each([1])('outside %s', noop)).toThrow(/^test\.each\(\) /);
     await expect(collectModule(async () => test.each([1])('no body %s', {} as never))).rejects.toThrow(
       'test body function is required',

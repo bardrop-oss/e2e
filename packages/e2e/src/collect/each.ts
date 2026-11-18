@@ -1,6 +1,6 @@
 /** Row handling for `test.each` and `test.for`: the rows check and each row's title. */
 
-import { inspect } from 'node:util';
+import { inspect, types } from 'node:util';
 import { CollectionError } from '@e2e-dev/core/lib/internal/errors';
 import { describeValue } from '@e2e-dev/core/lib/config/validate';
 
@@ -8,6 +8,10 @@ import { describeValue } from '@e2e-dev/core/lib/config/validate';
 export function readRows(api: string, rows: unknown): readonly unknown[] {
   if (!Array.isArray(rows)) {
     throw new CollectionError(`${api} takes an array of rows, got ${describeValue(rows)}`);
+  }
+  // Jest and Vitest also take a table as a tagged template, whose strings would pass as rows.
+  if ('raw' in rows) {
+    throw new CollectionError(`${api} takes an array of rows, not a template literal table; write each row as an object or an array`);
   }
   if (rows.length === 0) {
     throw new CollectionError(`${api} got no rows; pass at least one`);
@@ -59,7 +63,7 @@ export function formatEachTitle(title: string, row: unknown, index: number): str
       case '%j':
         return json(item, index);
       case '%o':
-        return inspect(item, ONE_LINE);
+        return inspected(item);
       default:
         return display(item);
     }
@@ -80,15 +84,26 @@ function readPath(row: object, key: string): unknown {
 }
 
 /**
- * Node's inspect on one line. A title is a test id, so it must not break:
- * `breakLength` alone still groups long arrays and splits deep objects,
+ * `breakLength` alone still groups long arrays and splits deep objects;
  * `compact: true` keeps them on one line.
  */
 const ONE_LINE = { breakLength: Infinity, compact: true, depth: 4 } as const;
 
-/** A string as written, anything else as Node's inspect shows it on one line. */
+/**
+ * A value as Node's inspect shows it, on one line: a title is a test id, so
+ * it must not break. An Error shows as its name and message, as Vitest shows
+ * it, since inspect prints its stack, whose paths differ from one machine to
+ * the next. What inspect still breaks (the stack of an Error inside the
+ * value, a custom inspect) is joined.
+ */
+function inspected(value: unknown): string {
+  const text = types.isNativeError(value) ? Error.prototype.toString.call(value) : inspect(value, ONE_LINE);
+  return text.replace(/\s*\n\s*/g, ' ');
+}
+
+/** A string as written, anything else as `inspected` shows it. */
 function display(value: unknown): string {
-  return typeof value === 'string' ? value : inspect(value, ONE_LINE);
+  return typeof value === 'string' ? value : inspected(value);
 }
 
 /**
