@@ -797,7 +797,8 @@ export interface TestAPI<Fixtures = TestFixtures, Worker = WorkerFixtures> exten
    *   test.each([[1, 2, 3]])('%i + %i = %i', async (a, b, sum, { app }) => {});
    *
    * Rows must be a non-empty array. Two rows that format to the same title
-   * fail as duplicate titles.
+   * fail as duplicate titles. As in a test body, destructure the fixtures
+   * (`{ app }`): e2e sets up only the ones named there.
    */
   each<Row extends readonly unknown[] | [unknown]>(rows: readonly Row[]): EachRegistrar<[...Row, Fixtures & Worker]>;
   each<Row>(rows: readonly Row[]): EachRegistrar<EachArgs<Row, Fixtures & Worker>>;

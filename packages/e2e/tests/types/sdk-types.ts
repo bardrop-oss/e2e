@@ -48,7 +48,6 @@ import {
   type TestFilterContext,
   type TestRegistrar,
   type EachRegistrar,
-  type TestFixtures,
   type Unique,
   type CacheStore,
   type ExecutorObservation,
@@ -621,9 +620,9 @@ test.for(pairs)('%i is %s', async ([n, word], { app }) => { n satisfies number; 
 // A table that mixes array and non-array rows is never spread, as at run time.
 declare const mixed: ReadonlyArray<readonly [number, string] | { user: string }>;
 test.each(mixed)('row %#', async (row, { app }) => { row satisfies readonly [number, string] | { user: string }; void app; });
-// An unknown row may be spread or not at run time: only the fixtures, last, are typed.
+// An unknown row may be spread or not at run time, so test.for, which never spreads, is the way to take the fixtures.
 declare const loose: unknown[];
-test.each(loose)('row %#', async (...args) => { args satisfies [...unknown[], TestFixtures]; });
+test.for(loose)('row %#', async (row, { app }) => { row satisfies unknown; void app; });
 // @ts-expect-error an unknown row may be spread, so the second argument is not known to be the fixtures
 test.each(loose)('row %#', async (_row, { app }) => { void app; });
 // @ts-expect-error rows are an array

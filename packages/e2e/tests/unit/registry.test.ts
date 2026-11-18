@@ -287,14 +287,18 @@ describe('registration', () => {
 
   it('spreads test.each rows before the fixtures only when every row is an array, and passes test.for rows whole', async () => {
     const calls: unknown[][] = [];
-    const record = async (...args: unknown[]) => {
-      calls.push(args);
+    const spread = async (n: unknown, word: unknown, { app }: { app: unknown }) => {
+      calls.push([n, word, { app }]);
+    };
+    const whole = async (row: unknown, { app }: { app: unknown }) => {
+      calls.push([row, { app }]);
     };
     const registration = await collectModule(async () => {
-      test.each([[1, 'one'], [2, 'two']])('each %#', record);
-      test.each([[1, 'one'], { user: 'Ada' }, 'plain'])('mixed %#', record);
-      test.for([[1, 'one'], { user: 'Ada' }])('for %#', record);
+      test.each([[1, 'one'], [2, 'two']])('each %#', spread as never);
+      test.each([[1, 'one'], { user: 'Ada' }, 'plain'])('mixed %#', whole as never);
+      test.for([[1, 'one'], { user: 'Ada' }])('for %#', whole as never);
     });
+    expect(registration.tests.map((item) => item.names)).toEqual(Array.from({ length: 7 }, () => ['app']));
     const fixtures = { app: 'app fixture' };
     for (const registered of registration.tests) await (registered.fn as (fixtures: unknown) => Promise<void>)(fixtures);
     expect(calls).toEqual([
@@ -308,8 +312,42 @@ describe('registration', () => {
     ]);
   });
 
+  it('reads a test.each body\'s fixtures from the parameter after the row', async () => {
+    const registration = await collectModule(async () => {
+      test.each([[1, 2]])('spread %#', async (_a: number, _b: number, { app, screen }: { app: unknown; screen: unknown }) => {
+        void app;
+        void screen;
+      });
+      test.each([{ user: 'Ada' }])('object %#', async ({ user }: { user: string }, { app }: { app: unknown }) => {
+        void user;
+        void app;
+      });
+      test.for([[1, 2]])('for %#', async ([a]: number[], { screen }: { screen: unknown }) => {
+        void a;
+        void screen;
+      });
+      test.each([1])('no fixtures %#', async (_n: number) => {});
+    });
+    expect(registration.tests.map((item) => [item.title, item.names])).toEqual([
+      ['spread 0', ['app', 'screen']],
+      ['object 0', ['app']],
+      ['for 0', ['screen']],
+      ['no fixtures 0', []],
+    ]);
+    await expect(collectModule(async () => {
+      test.each([[1, 2]])('whole %#', async (_a: number, _b: number, fixtures: unknown) => {
+        void fixtures;
+      });
+    })).rejects.toThrow(/test "whole 0" must destructure parameter 3, where it takes the fixtures, as in \(\{ app, screen \}\) => \{\}; it takes "fixtures"/);
+    await expect(collectModule(async () => {
+      test.each([[1, 2]])('rest %#', async (...args: unknown[]) => {
+        void args;
+      });
+    })).rejects.toThrow(/test "rest 0" must destructure parameter 3, where it takes the fixtures.*it takes "\.\.\.args"/);
+  });
+
   it('applies test.each options to every row and works on an extended test', async () => {
-    const extended = test.extend({ workspace: async (_fixtures: unknown, use: (value: string) => Promise<void>) => use('w') });
+    const extended = test.extend({ workspace: async ({}, use: (value: string) => Promise<void>) => use('w') });
     const registration = await collectModule(async () => {
       test.each([1, 2])('skipped %s', { skip: 'not yet', tags: ['@each'] }, noop);
       test.for([1])('focused %s', { only: true }, noop);
